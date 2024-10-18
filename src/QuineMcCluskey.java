@@ -5,18 +5,19 @@ public class QuineMcCluskey {
     private List<String> minterms;
     // Список строк, представляющих существенные импликанты.
     private List<String> essentialImplicants;
+    private Integer numVars;
 
     // Конструктор, принимающий список минтермов и количество переменных.
-    public QuineMcCluskey(List<Integer> mintermList, int numVars) {
-        minterms = new ArrayList<>();
+    public QuineMcCluskey(String truthTableString) {
+        this.numVars = (int) (Math.log(truthTableString.length()) / Math.log(2));
+        this.minterms = new ArrayList<>();
+        this.essentialImplicants = new ArrayList<>();
 
-        // Конвертируем каждый минтерм в двоичную строку с заданной длиной.
-        for (Integer minterm : mintermList) {
-            minterms.add(toBinaryString(minterm, numVars));
+        for (int i = 0; i < truthTableString.length(); i++) {
+            if (truthTableString.charAt(i) == '1') {
+                minterms.add(toBinaryString(i, numVars));
+            }
         }
-
-        // Инициализируем список для хранения существенных импликантов.
-        essentialImplicants = new ArrayList<>();
     }
 
     // Метод для минимизации логической функции.
@@ -104,32 +105,54 @@ public class QuineMcCluskey {
     // Нахождение существенных импликантов из списка простых.
     private List<String> findEssentialImplicants(List<String> primeImplicants) {
         List<String> essentials = new ArrayList<>();
+        boolean[] coveredMinterms = new boolean[minterms.size()];
 
-        // Для каждого минтерма ищем импликанты, которые его покрывают.
-        for (String minterm : minterms) {
+        // Проходим по каждому минтерму
+        for (int i = 0; i < minterms.size(); i++) {
+            String minterm = minterms.get(i);
             int count = 0;
-            String temp = null;
+            String coveringImplicant = null;
+
+            // Ищем импликанты, которые покрывают данный минтерм.
             for (String implicant : primeImplicants) {
-                // Проверяем, покрывает ли импликант данный минтерм.
                 if (matches(implicant, minterm)) {
                     count++;
-                    temp = implicant;
+                    coveringImplicant = implicant;
                 }
             }
 
-            // Если минтерм покрывается только одним импликантом — это существенный импликант.
-            if (count == 1 && !essentials.contains(temp)) {
-                essentials.add(temp);
+            // Если минтерм покрывается только одним импликантом, то этот импликант - существенный.
+            if (count == 1 && !essentials.contains(coveringImplicant)) {
+                essentials.add(coveringImplicant);
+                // Отмечаем все минтермы, покрываемые этим существенным импликантом.
+                for (int j = 0; j < minterms.size(); j++) {
+                    if (matches(coveringImplicant, minterms.get(j))) {
+                        coveredMinterms[j] = true;
+                    }
+                }
             }
         }
 
-        // Возвращаем список существенных импликантов.
+        // Добавьте импликанты для непокрытых минтермов (для полной минимизации)
+        for (int i = 0; i < coveredMinterms.length; i++) {
+            if (!coveredMinterms[i]) {
+                // Находим первый импликант, покрывающий этот минтерм
+                for (String implicant : primeImplicants) {
+                    if (matches(implicant, minterms.get(i))) {
+                        if (!essentials.contains(implicant)) {
+                            essentials.add(implicant);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        System.out.println(essentials);
         return essentials;
     }
 
     // Проверка, покрывает ли один импликант конкретный минтерм.
     private boolean matches(String implicant, String minterm) {
-        // Проверяем каждый символ, чтобы убедиться в совпадении.
         for (int i = 0; i < implicant.length(); i++) {
             if (implicant.charAt(i) != '-' && implicant.charAt(i) != minterm.charAt(i)) {
                 return false;
@@ -138,38 +161,58 @@ public class QuineMcCluskey {
         return true;
     }
 
-    // Конвертация бинарного представления импликанта в логическую функцию.
     private String convertToExpression(String binary) {
         StringBuilder expression = new StringBuilder();
-        char[] variables = {'A', 'B', 'C', 'D'};
+        char[] variables = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'};
 
-        // Перебираем каждую позицию в бинарной строке.
+        if (numVars > variables.length) {
+            throw new IllegalArgumentException("Превышено максимальное количество переменных: " + variables.length);
+        }
+
         for (int i = 0; i < binary.length(); i++) {
             if (binary.charAt(i) == '1') {
-                expression.append(variables[i]); // Добавляем переменную.
+                expression.append(variables[i]);
             } else if (binary.charAt(i) == '0') {
-                expression.append(variables[i]).append("'"); // Добавляем отрицание переменной.
+                expression.append(variables[i]).append("'");
             }
         }
-        // Возвращаем строку в виде логического выражения.
         return expression.toString();
     }
 
     public void printResult() {
         System.out.println("Минимизированная функция:");
+        if (essentialImplicants.isEmpty()) {
+            System.out.println("0"); // Вывод "0", если нет существенных импликантов
+            return;
+        }
+
         List<String> expressions = new ArrayList<>();
-        // Преобразуем каждый существенный импликант в логическое выражение.
         for (String implicant : essentialImplicants) {
             expressions.add("( " + convertToExpression(implicant) + " )");
         }
-        // Выводим результаты в виде дизъюнкции логических выражений.
-        System.out.println(String.join(" ∨ ", expressions ));
+        System.out.println(String.join(" ∨ ", expressions));
     }
 
     public static void main(String[] args) {
-        List<Integer> minterms = Arrays.asList(2, 3, 5, 6, 9);
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Введите строку значений функции (0 и 1): ");
+        String truthTableString = scanner.nextLine();
+
+        // Проверка на корректность ввода (только 0 и 1)
+        if (!truthTableString.matches("[01]+")) {
+            System.out.println("Ошибка: в строке должны быть только символы '0' и '1'.");
+            return;
+        }
+
+        // Проверка на количество значений (2^n)
+        if ((truthTableString.length() & (truthTableString.length() - 1)) != 0) {
+            System.out.println("Ошибка: длина строки должна быть степенью двойки.");
+            return;
+        }
+//        List<Integer> minterms = Arrays.asList(2, 3, 5, 6, 9);
         // Создание нового объекта QuineMcCluskey с заданными минтермами.
-        QuineMcCluskey qmc = new QuineMcCluskey(minterms, 4);
+        QuineMcCluskey qmc = new QuineMcCluskey(truthTableString);
         qmc.minimize(); // Запускаем процесс минимизации.
         qmc.printResult(); // Печатаем результат.
     }
